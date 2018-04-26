@@ -4,65 +4,59 @@
  * Author: Svyatoslav Polishchuk
  * Date: 25/04/2018
  *
+ * https://www.hackster.io/ravee-tansangworn/reading-rfid-card-or-key-ring-and-display-on-lcd-b2f70d
  */
 
-/* Include the RFID library */
-/* SEE RFID.h for selecting Hardware or Software SPI modes */
-#include "RFID.h"
+ // #include "LiquidCrystal_I2C.h"
+ #include "RFID.h"
 
-/* Define the pins used for the SS (SDA) and RST (reset) pins for BOTH hardware and software SPI */
-/* Change as required */
-#define SS_PIN      A2      // Same pin used as hardware SPI (SS)
-#define RST_PIN     D2
+ #define SS_PIN      A2
+ #define RST_PIN     D3
 
-/* Define the pins used for the DATA OUT (MOSI), DATA IN (MISO) and CLOCK (SCK) pins for SOFTWARE SPI ONLY */
-/* Change as required and may be same as hardware SPI as listed in comments */
-#define MOSI_PIN    D3      // hardware SPI: A5
-#define MISO_PIN    D4      //     "     " : A4
-#define SCK_PIN     D5      //     "     " : A3
+ // int led1 = D7;
 
-/* Create an instance of the RFID library */
-#if defined(_USE_SOFT_SPI_)
-    RFID RC522(SS_PIN, RST_PIN, MOSI_PIN, MISO_PIN, SCK_PIN);    // Software SPI
-#else
-    RFID RC522(SS_PIN, RST_PIN);                                 // Hardware SPI
-#endif
+ MFRC522 mfrc522(SS_PIN, RST_PIN);	// Create MFRC522 instance.
+ // LiquidCrystal_I2C lcd(0x27,20,4);
 
+ void setup()
+ {
+     Serial.begin(9600);                                                         // Open serial over USB
+     while(!Serial.isConnected()) Particle.process();                            // Wait if terminal isn't connected
+     Serial.println("What's up  Serial! 2 ");
+   // lcd.init();
+   // lcd.backlight();
+    //  SPI.begin();
+    //  SPI.setClockDivider(SPI_CLOCK_DIV8);
+ // 	pinMode(led1, OUTPUT);
+     mfrc522.PCD_Init();
+ }
 
-void setup()
-{
-    Serial.begin(9600);                                                         // Open serial over USB
-    while(!Serial.isConnected()) Particle.process();                            // Wait if terminal isn't connected
-    Serial.println("What's up Serial!");
+ void loop() {
 
-    #if !defined(_USE_SOFT_SPI_)
-        SPI.setDataMode(SPI_MODE0);                                             // Enable the HW SPI interface
-        SPI.setBitOrder(MSBFIRST);
-        SPI.setClockDivider(SPI_CLOCK_DIV8);
-        SPI.begin();
-    #endif
- 
-    RC522.init();                                                               // Initialise the RFID reader
-}
+    //  digitalWrite(led1, LOW);
+     // Look for new cards, if nothing found, quit
+     if ( ! mfrc522.PICC_IsNewCardPresent()) {
+     	return;
+        Serial.println("New card found");
+     }
 
-void loop()
-{
-  uint8_t i;                                                                    // Temporary loop counter
+     // Select one of the cards, if nothing found, quit
+     if ( ! mfrc522.PICC_ReadCardSerial()) {
+     	return;
+        Serial.println("Something found");
+     }
 
-  if (RC522.isCard())                                                           // Has a card been detected?
-  {
-    RC522.readCardSerial();                                                     // If so then get its serial number
-    Serial.println("Card detected:");
+     String cardID = "";
 
-    for(i = 0; i <= 4; i++)                                                     // Output the serial number to the UART
-    {
-      Serial.print(RC522.serNum[i],HEX);
-      Serial.print(" ");
-    }
-    Serial.println();
-  }
-  else
-      Serial.println("Card NOT detected :(");
+     for (byte i = 0; i < mfrc522.uid.size; i++) {
+         cardID += String(mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
+         cardID += String(mfrc522.uid.uidByte[i], HEX);
+     }
+    //  digitalWrite(led1, HIGH);
+     Serial.println(cardID);
+     mfrc522.PICC_HaltA();
+     Serial.println("Nothing found");
+     delay(1000);
 
-  delay(1000);
-}
+    //  lcd.clear();
+ }
